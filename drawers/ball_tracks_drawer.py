@@ -2,6 +2,8 @@ from .utils import draw_triangle
 class BallTracksDrawer:
     def __init__(self):
         self.ball_pointer_color=(0,255,0)
+        self.tail_length = 15
+        self.tail_thickness = 2
         
         
     def draw(self,video_frames,tracks):
@@ -10,6 +12,9 @@ class BallTracksDrawer:
             frame=frame.copy()
             
             ball_dict=tracks[frame_num]
+            
+            
+            
             
             
             for _, track in ball_dict.items():
