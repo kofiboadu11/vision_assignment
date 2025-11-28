@@ -1,0 +1,19 @@
+[
+  {
+    "shooter_id": 41,
+    "result": "MISS",
+    "start_frame": 58,
+    "release_frame": 59,
+    "end_frame": 107,
+    "trajectory": [
+      [
+        235,
+        122
+      ],
+      [
+        1,
+        86
+      ]
+    ]
+  }
+]
