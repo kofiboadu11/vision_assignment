@@ -58,20 +58,74 @@ class PoseTracker:
 
         return shooter_id
 
+    def detect_shot_sequences(self, ball_tracks):
+        """
+        Detect shot sequences by analyzing ball movement.
+        Returns list of (start_frame, end_frame, is_active) tuples.
+        """
+        shot_sequences = []
+        in_shot = False
+        shot_start = None
+        shot_window = 60  # Maintain shooter ID for 60 frames (2 seconds at 30fps)
+
+        for frame_num in range(len(ball_tracks) - 1):
+            ball_data = ball_tracks[frame_num].get(1, {})
+            next_ball_data = ball_tracks[frame_num + 1].get(1, {})
+
+            if "bbox" not in ball_data or "bbox" not in next_ball_data:
+                continue
+
+            # Calculate vertical velocity (negative = upward movement)
+            ball_y = (ball_data["bbox"][1] + ball_data["bbox"][3]) / 2
+            next_ball_y = (next_ball_data["bbox"][1] + next_ball_data["bbox"][3]) / 2
+            vertical_velocity = next_ball_y - ball_y
+
+            # Detect start of shot (rapid upward movement)
+            if not in_shot and vertical_velocity < -5:  # Ball moving up significantly
+                in_shot = True
+                shot_start = frame_num
+
+            # End shot sequence after window expires
+            if in_shot and frame_num >= shot_start + shot_window:
+                shot_sequences.append((shot_start, frame_num))
+                in_shot = False
+                shot_start = None
+
+        # Close any open shot sequence
+        if in_shot and shot_start is not None:
+            shot_sequences.append((shot_start, len(ball_tracks) - 1))
+
+        return shot_sequences
+
     def get_pose_tracks(self, frames, player_tracks, ball_tracks):
         """
         Get pose keypoints for the shooter in each frame.
+        Identifies shooter at the start of each shot and maintains that ID throughout.
         Returns a list of dicts with pose data per frame.
         Format: [{track_id: {'keypoints': [...], 'confidence': [...]}}, ...]
         """
         detections = self.detect_frames(frames)
         pose_tracks = []
 
+        # Detect shot sequences
+        shot_sequences = self.detect_shot_sequences(ball_tracks)
+
+        # Create a mapping of frame -> shooter_id
+        frame_to_shooter = {}
+        for start_frame, end_frame in shot_sequences:
+            # Identify shooter at the start of the shot
+            shooter_id = self.get_shooter_id(player_tracks, ball_tracks, start_frame)
+            if shooter_id is not None:
+                # Apply this shooter_id to all frames in the shot sequence
+                for frame in range(start_frame, end_frame + 1):
+                    frame_to_shooter[frame] = shooter_id
+
+        # Generate pose tracks using the locked shooter IDs
         for frame_num, detection in enumerate(detections):
             pose_tracks.append({})
 
-            # Identify the shooter for this frame
-            shooter_id = self.get_shooter_id(player_tracks, ball_tracks, frame_num)
+            # Get the locked shooter ID for this frame
+            shooter_id = frame_to_shooter.get(frame_num)
             if shooter_id is None:
                 continue
 
