@@ -1,6 +1,8 @@
 from utils import read_video, save_video, get_center_of_bbox
 from trackers import PlayerTracker, BallTracker, HoopTracker, PoseTracker
 from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer, PoseDrawer
+from shot_analyzer import SimpleShotAnalyzer
+from quality_overlay import QualityOverlay
 
 def detect_shots(ball_tracks, hoop_tracks):
     """
@@ -125,13 +127,30 @@ def main():
     # 4. Detect Shots and Results
     print("Detecting Shots...")
     shot_frames, shot_results = detect_shots(ball_tracks, hoop_tracks)
-    
-    # 5. Draw Output
+
+    # 5. Analyze Shot Quality (Simple)
+    print("Analyzing Shot Quality...")
+    analyzer = SimpleShotAnalyzer()
+    frame_height, frame_width = video_frames[0].shape[:2]
+
+    shot_analyses = []
+    for frame_num, is_shot in enumerate(shot_frames):
+        if is_shot:
+            analysis = analyzer.analyze_shot(
+                pose_tracks, ball_tracks, hoop_tracks, player_tracks,
+                frame_num, frame_width, frame_height
+            )
+            if analysis:
+                shot_analyses.append(analysis)
+                print(f"  Shot at frame {frame_num}: Quality = {analysis['quality_score']:.1f}/100")
+
+    # 6. Draw Output
     print("Drawing...")
     player_tracks_drawer = PlayerTracksDrawer()
     ball_tracks_drawer = BallTracksDrawer()
     shot_drawer = ShotDrawer()
     pose_drawer = PoseDrawer()
+    quality_overlay = QualityOverlay()
 
     output_video_frames = player_tracks_drawer.draw(video_frames, player_tracks)
     output_video_frames = ball_tracks_drawer.draw(output_video_frames, ball_tracks)
@@ -141,9 +160,13 @@ def main():
 
     # Draw shot detection text overlay AND trajectory (pass shot_results)
     output_video_frames = shot_drawer.draw(output_video_frames, shot_frames, ball_tracks, shot_results)
-    
+
+    # Draw quality overlay
+    output_video_frames = quality_overlay.draw(output_video_frames, shot_analyses, shot_frames)
+
     save_video(output_video_frames, "output_videos/output_video.avi")
     print("Done!")
+    print(f"\nAnalyzed {len(shot_analyses)} shots")
     
 if __name__ == "__main__":
     main()
