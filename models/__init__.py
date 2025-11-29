@@ -1,1 +1,0 @@
-from .shot_quality_predictor import ShotQualityPredictor

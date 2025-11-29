@@ -1,9 +1,6 @@
 from utils import read_video, save_video, get_center_of_bbox
 from trackers import PlayerTracker, BallTracker, HoopTracker, PoseTracker
-from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer, PoseDrawer, ShotQualityDrawer
-from features import ShotFeatureExtractor
-from models import ShotQualityPredictor
-import json
+from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer, PoseDrawer
 
 def detect_shots(ball_tracks, hoop_tracks):
     """
@@ -128,84 +125,13 @@ def main():
     # 4. Detect Shots and Results
     print("Detecting Shots...")
     shot_frames, shot_results = detect_shots(ball_tracks, hoop_tracks)
-
-    # 5. Extract Shot Quality Features
-    print("Analyzing Shot Quality...")
-    feature_extractor = ShotFeatureExtractor()
-    quality_predictor = ShotQualityPredictor()
-
-    # Get frame dimensions
-    frame_height, frame_width = video_frames[0].shape[:2]
-
-    # Find all shots and extract features
-    shot_predictions = []
-    shot_features_list = []
-
-    for frame_num, is_shot in enumerate(shot_frames):
-        if is_shot:
-            # Determine shot sequence (from pose tracker's shot detection)
-            # For simplicity, use a window around the shot detection
-            shot_start = max(0, frame_num - 60)
-            shot_end = frame_num
-
-            # Get shooter ID from pose tracks
-            shooter_id = None
-            if frame_num < len(pose_tracks) and pose_tracks[frame_num]:
-                shooter_id = list(pose_tracks[frame_num].keys())[0]
-
-            if shooter_id is not None:
-                # Extract features
-                features = feature_extractor.extract_shot_features(
-                    pose_tracks, ball_tracks, hoop_tracks, player_tracks,
-                    shot_start, shot_end, shooter_id,
-                    frame_width, frame_height
-                )
-
-                # Predict shot quality
-                prediction = quality_predictor.predict_shot_quality(features, frame_width)
-
-                # Store results
-                shot_predictions.append(prediction)
-                shot_features_list.append(features)
-
-                # Print summary
-                print(f"\nShot at frame {frame_num}:")
-                print(f"  Quality Score: {prediction['quality_score']:.1f}/100")
-                print(f"  Success Probability: {prediction['success_probability']:.1%}")
-                print(f"  Category: {prediction['quality_category']}")
-                print(f"  Actual Result: {shot_results[frame_num]}")
-
-    # Save shot analysis to JSON
-    analysis_output = {
-        'shots': []
-    }
-
-    shot_idx = 0
-    for frame_num, is_shot in enumerate(shot_frames):
-        if is_shot and shot_idx < len(shot_predictions):
-            analysis_output['shots'].append({
-                'frame': frame_num,
-                'prediction': shot_predictions[shot_idx],
-                'actual_result': shot_results[frame_num],
-                'features': {
-                    'biomechanics': shot_features_list[shot_idx]['biomechanics'],
-                    'trajectory': shot_features_list[shot_idx]['trajectory'],
-                    'contextual': shot_features_list[shot_idx]['contextual']
-                }
-            })
-            shot_idx += 1
-
-    with open('output_videos/shot_analysis.json', 'w') as f:
-        json.dump(analysis_output, f, indent=2)
-    print("\nShot analysis saved to output_videos/shot_analysis.json")
-
-    # 6. Draw Output
+    
+    # 5. Draw Output
     print("Drawing...")
     player_tracks_drawer = PlayerTracksDrawer()
     ball_tracks_drawer = BallTracksDrawer()
     shot_drawer = ShotDrawer()
     pose_drawer = PoseDrawer()
-    quality_drawer = ShotQualityDrawer()
 
     output_video_frames = player_tracks_drawer.draw(video_frames, player_tracks)
     output_video_frames = ball_tracks_drawer.draw(output_video_frames, ball_tracks)
@@ -215,14 +141,9 @@ def main():
 
     # Draw shot detection text overlay AND trajectory (pass shot_results)
     output_video_frames = shot_drawer.draw(output_video_frames, shot_frames, ball_tracks, shot_results)
-
-    # Draw shot quality analysis
-    output_video_frames = quality_drawer.draw(output_video_frames, shot_predictions, shot_frames)
-
+    
     save_video(output_video_frames, "output_videos/output_video.avi")
     print("Done!")
-    print(f"\nProcessed {len(shot_predictions)} shots")
-    print("Output saved to output_videos/output_video.avi")
     
 if __name__ == "__main__":
     main()
