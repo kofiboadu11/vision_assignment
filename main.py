@@ -1,6 +1,6 @@
 from utils import read_video, save_video, get_center_of_bbox
-from trackers import PlayerTracker, BallTracker, HoopTracker
-from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer
+from trackers import PlayerTracker, BallTracker, HoopTracker, PoseTracker
+from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer, PoseDrawer
 
 def detect_shots(ball_tracks, hoop_tracks):
     """
@@ -105,6 +105,7 @@ def main():
     player_tracker = PlayerTracker(model_path)
     ball_tracker = BallTracker(model_path)
     hoop_tracker = HoopTracker(model_path)
+    pose_tracker = PoseTracker()  # Uses default YOLO11 pose model
     
     # 3. Get Tracks
     print("Tracking Players...")
@@ -117,7 +118,10 @@ def main():
     
     print("Tracking Hoop...")
     hoop_tracks = hoop_tracker.get_object_tracks(video_frames)
-    
+
+    print("Tracking Shooter Pose...")
+    pose_tracks = pose_tracker.get_pose_tracks(video_frames, player_tracks, ball_tracks)
+
     # 4. Detect Shots and Results
     print("Detecting Shots...")
     shot_frames, shot_results = detect_shots(ball_tracks, hoop_tracks)
@@ -127,10 +131,14 @@ def main():
     player_tracks_drawer = PlayerTracksDrawer()
     ball_tracks_drawer = BallTracksDrawer()
     shot_drawer = ShotDrawer()
-    
+    pose_drawer = PoseDrawer()
+
     output_video_frames = player_tracks_drawer.draw(video_frames, player_tracks)
     output_video_frames = ball_tracks_drawer.draw(output_video_frames, ball_tracks)
-    
+
+    # Draw pose estimation on shooter
+    output_video_frames = pose_drawer.draw(output_video_frames, pose_tracks, player_tracks)
+
     # Draw shot detection text overlay AND trajectory (pass shot_results)
     output_video_frames = shot_drawer.draw(output_video_frames, shot_frames, ball_tracks, shot_results)
     
