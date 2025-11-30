@@ -164,7 +164,18 @@ class Basketball51Dataset:
         video_files = self.get_video_files()
 
         if max_videos:
-            video_files = video_files[:max_videos]
+            # Ensure balanced class sampling
+            made_videos = [v for v in video_files if v[1] == 1]
+            missed_videos = [v for v in video_files if v[1] == 0]
+
+            # Take equal numbers from each class
+            videos_per_class = max_videos // 2
+            video_files = (
+                made_videos[:videos_per_class] +
+                missed_videos[:videos_per_class]
+            )
+            print(f"Balanced sampling: {len([v for v in video_files if v[1] == 1])} made, "
+                  f"{len([v for v in video_files if v[1] == 0])} missed")
 
         dataset = []
 

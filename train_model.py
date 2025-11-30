@@ -126,16 +126,29 @@ class ShotQualityModel:
 
         # Predictions
         y_pred = self.model.predict(X_test)
-        y_pred_proba = self.model.predict_proba(X_test)[:, 1]
+
+        # Get probabilities - handle single class case
+        y_pred_proba_full = self.model.predict_proba(X_test)
+        if y_pred_proba_full.shape[1] == 2:
+            # Both classes present
+            y_pred_proba = y_pred_proba_full[:, 1]
+        else:
+            # Only one class - use its probability
+            y_pred_proba = y_pred_proba_full[:, 0]
 
         # Calculate metrics
+        n_classes_test = len(np.unique(y_test))
+        n_classes_pred = len(np.unique(y_pred))
+
         metrics = {
             'accuracy': accuracy_score(y_test, y_pred),
             'precision': precision_score(y_test, y_pred, zero_division=0),
             'recall': recall_score(y_test, y_pred, zero_division=0),
             'f1_score': f1_score(y_test, y_pred, zero_division=0),
-            'auc_roc': roc_auc_score(y_test, y_pred_proba) if len(np.unique(y_test)) > 1 else 0.0,
-            'confusion_matrix': confusion_matrix(y_test, y_pred).tolist()
+            'auc_roc': roc_auc_score(y_test, y_pred_proba) if n_classes_test > 1 else 0.0,
+            'confusion_matrix': confusion_matrix(y_test, y_pred).tolist(),
+            'n_classes_test': n_classes_test,
+            'n_classes_trained': len(self.model.classes_)
         }
 
         return metrics
@@ -145,17 +158,35 @@ class ShotQualityModel:
         print("\n" + "=" * 50)
         print("MODEL EVALUATION RESULTS")
         print("=" * 50)
+
+        # Check for single-class issues
+        if metrics.get('n_classes_trained', 2) < 2:
+            print("⚠️  WARNING: Model trained on only ONE class!")
+            print("   Dataset should include both made and missed shots.")
+            print("   Run prepare_dataset.py with balanced data.\n")
+
+        if metrics.get('n_classes_test', 2) < 2:
+            print("⚠️  WARNING: Test set contains only ONE class!")
+            print("   Metrics may not be meaningful.\n")
+
         print(f"Accuracy:  {metrics['accuracy']:.4f}")
         print(f"Precision: {metrics['precision']:.4f}")
         print(f"Recall:    {metrics['recall']:.4f}")
         print(f"F1 Score:  {metrics['f1_score']:.4f}")
         print(f"AUC-ROC:   {metrics['auc_roc']:.4f}")
+
+        # Handle confusion matrix for both single and multi-class
         print("\nConfusion Matrix:")
         cm = np.array(metrics['confusion_matrix'])
-        print(f"              Predicted")
-        print(f"              Miss  Made")
-        print(f"Actual Miss   {cm[0,0]:4d}  {cm[0,1]:4d}")
-        print(f"       Made   {cm[1,0]:4d}  {cm[1,1]:4d}")
+
+        if cm.shape == (2, 2):
+            print(f"              Predicted")
+            print(f"              Miss  Made")
+            print(f"Actual Miss   {cm[0,0]:4d}  {cm[0,1]:4d}")
+            print(f"       Made   {cm[1,0]:4d}  {cm[1,1]:4d}")
+        else:
+            print(f"  Single class confusion matrix: {cm.tolist()}")
+
         print("=" * 50)
 
     def get_feature_importance(self) -> Dict[str, float]:
@@ -241,6 +272,18 @@ def train_and_evaluate(dataset_path: str, model_save_path: str, test_size: float
     print(f"\nTrain set: {len(X_train)} samples")
     print(f"Test set:  {len(X_test)} samples")
     print(f"Class distribution - Made: {sum(y_train)}/{sum(y_test)}, Missed: {len(y_train)-sum(y_train)}/{len(y_test)-sum(y_test)}")
+
+    # Check for class balance issues
+    if len(np.unique(y_train)) < 2:
+        print("\n⚠️  ERROR: Training set contains only one class!")
+        print("   Cannot train a binary classifier with only one class.")
+        print("   Please run: python prepare_dataset.py")
+        print("   This will create a balanced dataset with both made and missed shots.")
+        return None, None
+
+    if len(np.unique(y_test)) < 2:
+        print("\n⚠️  WARNING: Test set contains only one class!")
+        print("   Evaluation metrics will be limited.")
 
     # Preprocess
     X_train = model.preprocess(X_train, fit=True)
