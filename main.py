@@ -97,7 +97,8 @@ def determine_shot_result(ball_tracks, shot_frame, frames_to_check, hoop_center_
 
 def main():
     # 1. Read Video
-    video_path = "input_videos/YTDown.com_YouTube_LeBron-Jokes-After-Steph-Misses-Free-Thr_Media_welHDbZ0KBY_001_720p.mp4"
+    # Using Basketball-51 dataset - free throw shot
+    video_path = "input_videos/Basketball_51 dataset/ft1/ft1_v108_000302_x264.mp4"
     video_frames = read_video(video_path)
     
     # 2. Load Trackers
