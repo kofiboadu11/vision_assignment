@@ -1,6 +1,7 @@
 from utils import read_video, save_video, get_center_of_bbox
 from trackers import PlayerTracker, BallTracker, HoopTracker, PoseTracker
 from drawers import PlayerTracksDrawer, BallTracksDrawer, ShotDrawer, PoseDrawer
+from analyzers import ShotQualityAnalyzer
 
 def detect_shots(ball_tracks, hoop_tracks):
     """
@@ -126,8 +127,30 @@ def main():
     # 4. Detect Shots and Results
     print("Detecting Shots...")
     shot_frames, shot_results = detect_shots(ball_tracks, hoop_tracks)
-    
-    # 5. Draw Output
+
+    # 5. Analyze Shot Quality
+    print("Analyzing Shot Quality...")
+    quality_analyzer = ShotQualityAnalyzer()
+    shot_analyses = []
+
+    for frame_num, is_shot in enumerate(shot_frames):
+        if is_shot:
+            analysis = quality_analyzer.analyze_shot(
+                shot_frame=frame_num,
+                ball_tracks=ball_tracks,
+                hoop_tracks=hoop_tracks,
+                pose_tracks=pose_tracks,
+                shot_result=shot_results[frame_num],
+                video_path=video_path
+            )
+            shot_analyses.append(analysis)
+            print(f"  Shot at frame {frame_num}: Quality={analysis['quality']}, Score={analysis['overall_score']:.1f}")
+
+    # Save quality analysis to JSON
+    if shot_analyses:
+        quality_analyzer.save_analysis(shot_analyses, "output_videos/shot_analysis.json")
+
+    # 6. Draw Output
     print("Drawing...")
     player_tracks_drawer = PlayerTracksDrawer()
     ball_tracks_drawer = BallTracksDrawer()
